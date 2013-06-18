@@ -1,0 +1,49 @@
+#!/usr/bin/env perl
+# This scripts wants as input a copy of the sonicwall management website
+# showing the VPN connections. It assumes that the sonicwall on the other side
+# as the .254
+# @author Robin Schneider <ypid23@aol.de>
+# @company hamcos IT Service GmbH http://www.hamcos.de
+# @licence GPLv3+ <http://www.gnu.org/licenses/gpl.html>
+use strict;
+use warnings;
+use autodie;
+use feature qw(say);
+use utf8;
+use open qw(:std :utf8);
+binmode STDOUT, ':encoding(UTF-8)';
+
+my $tag_list = '|customer|lan|nograph|ping|critical|dns|con|wato|/" + FOLDER_PATH + "/"';
+my %host_ip;
+my $hostname;
+while (<>) {
+    if (/ \d+?\s+?(\w+)/) {
+        $hostname = $1;
+    }
+    elsif (/[^-]*?- (\d+).(\d+).(\d+).(\d+)./) {
+        my $ip_last_oct = $4 - 1;
+        $host_ip{$hostname} = "$1.$2.$3.$ip_last_oct";
+        # say " $1.$2.$3.$ip_last_oct";
+    }
+}
+
+say 'all_hosts += [';
+for (keys %host_ip) {
+say qq(  "$_|$tag_list,);
+}
+say ']';
+
+say 'ipaddresses.update({';
+for (keys %host_ip) {
+    say qq(  '$_': u'$host_ip{$_}',);
+}
+say '})';
+
+say q#host_contactgroups.append(
+  ( ['con'], [ '/' + FOLDER_PATH + '/' ], ALL_HOSTS ))#;
+
+say 'host_attributes.update({';
+for (keys %host_ip) {
+say qq(  '$_': {'ipaddress': u'$host_ip{$_}'},);
+}
+say '})';
