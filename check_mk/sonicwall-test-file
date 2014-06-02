@@ -1,0 +1,9 @@
+ 3	KFGDELB	0.0.0.0 	Tunnel is active - click to show status
+Tunnel is active - click to show status
+192.168.53.0 - 192.168.53.255
+172.17.0.0 - 172.17.255.255
+ESP: 3DES/HMAC SHA1 (IKE)		Edit this entryDelete this entry
+ 3	KFGVPN01	0.0.0.0 	Tunnel is active - click to show status
+192.168.70.0 - 192.168.70.255
+ESP: 3DES/HMAC SHA1 (IKE)		Edit this entryDelete this entry
+ 5	KFGVPN05	0.0.0.0 	Tunnel is active - click to show status
