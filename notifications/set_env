@@ -1,0 +1,9 @@
+export NOTIFY_HOSTNAME="test &ü"
+export NOTIFY_HOSTWHAT="test"
+export NOTIFY_HOSTTAGS="prod /wato/connection/"
+export NOTIFY_WHAT="HOST"
+export NOTIFY_HOSTSTATE="CRITICAL"
+export NOTIFY_CONTACTPAGER=asd
+export NOTIFY_PARAMETERS="!prods !tests /wato/connection/"
+export NOTIFY_CONTACTEMAIL="robin.schneider@hamcos.de"
+# export NOTIFY_HOSTSTATE="OK"

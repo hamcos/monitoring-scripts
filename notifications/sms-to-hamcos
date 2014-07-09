@@ -1,0 +1,11 @@
+#!/usr/bin/python
+# SMS (using smstools) With customer ID and such useful stuff.
+# Notification via sms using the sms tools
+# Note: You have to add the side user to the sendsms group
+# and restart the site
+
+import os
+from hamcos import *
+from commonSMS import *
+
+send_sms(cust_info = True)

@@ -1,0 +1,13 @@
+#!/usr/bin/python
+# Mail only if all given tags match
+# You can specify host tags as plugin arguments. In this case the notification
+# will only be executed if the host has all host tags.
+# @author Robin Schneider <robin.schneider@hamcos.de>
+# @company hamcos IT Service GmbH http://www.hamcos.de
+# @licence GPLv3+ <http://www.gnu.org/licenses/gpl.html>
+
+from hamcos import *
+from commonMail import *
+exit_if_hosttag()
+
+main()

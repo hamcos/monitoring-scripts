@@ -1,0 +1,18 @@
+#!/usr/bin/python
+# SMS (using smstools) only if all given tags match
+# Notification via sms using the sms tools
+# Note: You have to add the side user to the sendsms group
+# and restart the site
+# You can specify host tags as plugin arguments. In this case the notification
+# will only be executed if the host has all host tags.
+# @author Robin Schneider <robin.schneider@hamcos.de>
+# @company hamcos IT Service GmbH http://www.hamcos.de
+# @licence GPLv3+ <http://www.gnu.org/licenses/gpl.html>
+
+import os
+from hamcos import *
+from commonSMS import *
+
+exit_if_hosttag()
+
+send_sms()
