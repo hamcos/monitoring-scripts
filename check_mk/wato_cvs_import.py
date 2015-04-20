@@ -39,7 +39,7 @@ import re
 
 class CsvToCheckMkConverter:
     CMK_TAG_SEPARATOR = '|'
-    DEFAULT_HOST_TAGS = CMK_TAG_SEPARATOR.join(('wato', '/\' + FOLDER_PATH + \'/'))
+    DEFAULT_HOST_TAGS = CMK_TAG_SEPARATOR.join(('wato', '/" + FOLDER_PATH + "/'))
     KEYS_IN_HOST_ATTRIBUTES = [
         'alias',
         'ipaddress'
@@ -94,9 +94,20 @@ class CsvToCheckMkConverter:
     def _parse_row(self):
         logger.debug("Parsing row: \"{0}\"".format(self.__row))
 
+        wato_foldername = self._wato_default_folder
+        if 'wato_foldername' in self.__row and self.__row['wato_foldername']:
+            wato_foldername = self.__row['wato_foldername']
+        elif not wato_foldername:
+            raise Exception(
+                "Column wato_foldername not given."
+                " Either specify it in the CSV file or use the parameter "
+            )
+
+        hostname = self.__row['hostname'] + self._hostname_suffix
+        self._folders.setdefault(wato_foldername, {})
         host_properties = {
             'hostname':   self.__row['hostname'] + self._hostname_suffix,
-            'host_alias': self.__get_host_property('host_alias'),
+            'alias':      self.__get_host_property('host_alias'),
             'ipaddress':  self.__get_host_property('ipaddress'),
             'host_tags':  self.__get_host_property('host_tags', default=''),
         }
@@ -110,19 +121,10 @@ class CsvToCheckMkConverter:
         if not host_properties['ipaddress']:
             host_properties['ipaddress'] = self.__get_host_property('ip')
 
-        wato_foldername = self._wato_default_folder
-        if 'wato_foldername' is self.__row and self.__row['wato_foldername']:
-            wato_foldername = self.__row['wato_foldername']
-        elif not wato_foldername:
-            raise Exception(
-                "Column wato_foldername not given."
-                " Either specify it in the CSV file or use the parameter "
-            )
-
         if not host_properties['ipaddress'] or host_properties['ipaddress'].lower() == "None".lower():
             host_properties['ipaddress'] = False
 
-        self._folders.setdefault(wato_foldername, []).append(host_properties)
+        self._folders[wato_foldername][hostname] = host_properties
 
     def __get_host_property(self, host_property, prefix='', suffix='', default=None):
         if host_property in self.__row:
@@ -133,19 +135,30 @@ class CsvToCheckMkConverter:
             return default
 
     def _get_host_attributes_string(self, host_properties):
-        host_attributes = ''
+        host_attributes = []
         for host_property in self.KEYS_IN_HOST_ATTRIBUTES:
             if host_property in host_properties and host_properties[host_property]:
-                    # host_attributes += "\t'{}': {{'alias' : u'{}', 'ipaddress' : '{}' }},\n".format(
-                host_attributes += "'{}': u'{}', ".format(host_property, host_properties[host_property])
+                # host_attributes += "\t'{}': {{'alias' : u'{}', 'ipaddress' : '{}' }},\n".format(
+                host_attributes.append("'{}': u'{}'".format(
+                    host_property,
+                    host_properties[host_property]
+                ))
 
-        if host_attributes:
-            return "\t'{}': {{ {}}},\n".format(
+        if len(host_attributes) > 0:
+            return " '{}': {{{}}},\n".format(
                 host_properties['hostname'],
-                host_attributes,
+                ':'.join(host_attributes),
             )
         else:
             return ''
+
+    def get_hosts(self):
+        output = ""
+        for wato_foldername in self._folders:
+            output += "\t{}:\n".format(wato_foldername)
+            for hostname in sorted(self._folders[wato_foldername]):
+                output += "{}\n".format(hostname)
+        return output
 
     def write_configuration(self, export_dir):
         for wato_foldername in self._folders:
@@ -158,33 +171,49 @@ class CsvToCheckMkConverter:
             all_hosts = ""
             host_attributes = ""
             ips = ""
-            for host_properties in self._folders[wato_foldername]:
-                all_hosts += "\t'{}{}',\n".format(
-                    host_properties['hostname'],
+            host_aliases = []
+            for hostname in sorted(self._folders[wato_foldername]):
+                host_properties = self._folders[wato_foldername][hostname]
+                all_hosts += '  "{}{}",\n'.format(
+                    hostname,
                     self.CMK_TAG_SEPARATOR + host_properties['host_tags'] if host_properties['host_tags'] else '',
                 )
                 host_attributes += self._get_host_attributes_string(host_properties)
                 if host_properties['ipaddress']:
-                    ips += "\t'{}': '{}',\n".format(host_properties['hostname'], host_properties['ipaddress'])
+                    ips += "{} '{}': '{}',\n".format(
+                        hostname,
+                        host_properties['ipaddress']
+                    )
+                if host_properties['alias']:
+                    host_aliases.append(" (u'{}', ['{}']),".format(
+                        host_properties['alias'],
+                        hostname,
+                    ))
 
             config_file = os.path.join(export_dir, wato_foldername, 'hosts.mk')
             logger.info("Writing configuration file: {}".format(config_file))
             target_file = open(config_file, 'w')
             target_file.write('# Written by {}\n'.format(os.path.basename(__file__)))
-            target_file.write('# encoding: utf-8\n')
+            target_file.write('# encoding: utf-8\n\n')
 
             target_file.write('all_hosts += [\n')
             target_file.write(all_hosts)
             target_file.write(']\n\n')
 
-            target_file.write('host_attributes.update({\n')
-            target_file.write(host_attributes)
-            target_file.write('})\n\n')
-
             if len(ips) > 0:
                 target_file.write('ipaddresses.update({\n')
                 target_file.write(ips)
-                target_file.write('})\n')
+                target_file.write('})\n\n')
+
+            if len(host_aliases) > 0:
+                target_file.write("extra_host_conf.setdefault('alias', []).extend([\n")
+                target_file.write('\n'.join(host_aliases))
+                target_file.write('\n])\n')
+
+            if host_attributes:
+                target_file.write('host_attributes.update({\n')
+                target_file.write(host_attributes)
+                target_file.write('})\n\n')
 
             target_file.close()
 
@@ -228,7 +257,7 @@ if __name__ == '__main__':
         '-e', '--export-dir',
         help="Check_MK WATO directory path where the generated configuration should be written to"
         " (default: %(default)s).",
-        default='/etc/check_mk/conf.d/wato',
+        default='/etc/check_mk/conf.d',
     )
     args_parser.add_argument(
         '-w', '--wato-default-folder',
@@ -245,6 +274,12 @@ if __name__ == '__main__':
             CsvToCheckMkConverter.CMK_TAG_SEPARATOR
         ),
         default='',
+    )
+    args_parser.add_argument(
+        '-l', '--list',
+        action='store_true',
+        default=False,
+        help=u"List hosts intended for the bulk import of WATO.",
     )
 
     args = args_parser.parse_args()
@@ -264,6 +299,9 @@ if __name__ == '__main__':
     )
 
     parser.parse()
-    parser.write_configuration(args.export_dir)
+    if args.list:
+        print(parser.get_hosts())
+    else:
+        parser.write_configuration(args.export_dir)
 
 # }}}
