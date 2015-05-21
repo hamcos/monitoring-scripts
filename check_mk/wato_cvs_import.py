@@ -74,7 +74,7 @@ class CsvToCheckMkConverter:
         # FIXME might use sniffer for delimiter detection.
         # logger.debug(csv.Sniffer().sniff(sample))
         if sample.find(','):
-            self._csv_delimiter = ';'
+            self._csv_delimiter = ','
         elif sample.find(';'):
             self._csv_delimiter = ';'
         else:
@@ -147,7 +147,7 @@ class CsvToCheckMkConverter:
         if len(host_attributes) > 0:
             return " '{}': {{{}}},\n".format(
                 host_properties['hostname'],
-                ':'.join(host_attributes),
+                ','.join(host_attributes),
             )
         else:
             return ''
@@ -180,7 +180,7 @@ class CsvToCheckMkConverter:
                 )
                 host_attributes += self._get_host_attributes_string(host_properties)
                 if host_properties['ipaddress']:
-                    ips += "{} '{}': '{}',\n".format(
+                    ips += "'{}': '{}',\n".format(
                         hostname,
                         host_properties['ipaddress']
                     )
