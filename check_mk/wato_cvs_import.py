@@ -20,6 +20,8 @@
 # Rewrite of
 # http://git.mathias-kettner.de/git/?p=check_mk.git;a=blob;f=doc/treasures/wato_import.py
 # to allow more flexibility and have a nicer code base.
+# Author: Bastian Kuhn bk@mathias-kettner.de, GPLv2
+#
 
 """
 Read CSV host list and create the hosts in Check_MK WATO.
