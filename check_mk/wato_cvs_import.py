@@ -67,8 +67,8 @@ class CsvToCheckMkConverter:
         self._csv_fh = open(self._csv_file, newline='')
 
         sample = self._csv_fh.read(1024)
-        if not csv.Sniffer().has_header(sample):
-            raise Exception("No header line in CSV file found. Example header: hostname;ip;description")
+        # if not csv.Sniffer().has_header(sample):
+        #     raise Exception("No header line in CSV file found. Example header: hostname;ip;description")
         self._csv_fh.seek(0)  # rewind
 
         # FIXME might use sniffer for delimiter detection.
