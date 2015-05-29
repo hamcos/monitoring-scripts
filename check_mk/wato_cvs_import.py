@@ -137,10 +137,13 @@ class CsvToCheckMkConverter:
         else:
             return default
 
-    def _get_host_attributes_string(self, host_properties):
+    def _get_host_attributes_string(self, host_properties, skip_properties=[]):
         host_attributes = []
         for host_property in self.KEYS_IN_HOST_ATTRIBUTES:
-            if host_property in host_properties and host_properties[host_property]:
+            if (host_property not in skip_properties
+                    and host_property in host_properties
+                    and host_properties[host_property]):
+
                 # host_attributes += "\t'{}': {{'alias' : u'{}', 'ipaddress' : '{}' }},\n".format(
                 host_attributes.append("'{}': u'{}'".format(
                     host_property,
@@ -171,6 +174,7 @@ class CsvToCheckMkConverter:
         return output
 
     def write_configuration(self, export_dir, include_ip_address=True):
+        logger.debug(include_ip_address)
         for wato_foldername in self._folders:
             path = os.path.join(export_dir, wato_foldername)
             try:
@@ -188,7 +192,10 @@ class CsvToCheckMkConverter:
                     hostname,
                     self.CMK_TAG_SEPARATOR + host_properties['host_tags'] if host_properties['host_tags'] else '',
                 )
-                host_attributes += self._get_host_attributes_string(host_properties)
+                host_attributes += self._get_host_attributes_string(
+                    host_properties,
+                    skip_properties=['' if include_ip_address else 'ipaddress'],
+                )
                 if include_ip_address and host_properties['ipaddress']:
                     ips += "'{}': '{}',\n".format(
                         hostname,
@@ -355,7 +362,6 @@ if __name__ == '__main__':
         parser.write_configuration(args.export_dir, not args.unresolvable_hosts_to_file)
 
     if args.unresolvable_hosts_to_file:
-        print(args.unresolvable_hosts_to_file)
         parser.write_dns_record_export(args.unresolvable_hosts_to_file, args.no_dns_resolve)
 
 
