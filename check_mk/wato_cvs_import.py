@@ -227,23 +227,26 @@ class CsvToCheckMkConverter:
 
             target_file.close()
 
-    def write_dns_import_file(self, filepath):
-        for wato_foldername in self._folders:
+    def write_dns_record_export(self, filepath, do_not_resolve_hostname):
+        with open(filepath, 'w', newline='') as outcsv:
+            writer = csv.writer(outcsv)
+            writer.writerow(["FQDN", "IP"])
 
-            with open(filepath, 'w', newline='') as outcsv:
-                writer = csv.writer(outcsv)
-                writer.writerow(["FQDN", "IP"])
-
+            for wato_foldername in self._folders:
                 for hostname in sorted(self._folders[wato_foldername]):
                     host_properties = self._folders[wato_foldername][hostname]
-                    try:
-                        dns_record = socket.gethostbyname(hostname)
-                    except socket.gaierror:
-                        dns_record = None
+
+                    dns_record = None
+                    if not do_not_resolve_hostname:
+                        try:
+                            dns_record = socket.gethostbyname(hostname)
+                        except socket.gaierror:
+                            dns_record = None
 
                     if dns_record:
                         logger.debug("Hostname {} is already resolvable.".format(hostname))
                     elif host_properties['ipaddress']:
+                        logger.debug("Write hostname/FQDN {} to {}".format(hostname, filepath))
                         writer.writerow([hostname, host_properties['ipaddress']])
                     else:
                         logger.error("Hostname {} is not resolvable and no IP address was given.".format(hostname))
@@ -301,6 +304,12 @@ if __name__ == '__main__':
         " If this option is used, the IP address will not be included into the configuration for Check_MK."
     )
     args_parser.add_argument(
+        '-n', '--no-dns-resolve',
+        action='store_true',
+        default=False,
+        help="Do not check if the host is already resolvable via DNS. See -u.",
+    )
+    args_parser.add_argument(
         '-w', '--wato-default-folder',
         help="Set a WATO default folder if non was specified for a given host.",
     )
@@ -347,7 +356,7 @@ if __name__ == '__main__':
 
     if args.unresolvable_hosts_to_file:
         print(args.unresolvable_hosts_to_file)
-        parser.write_dns_import_file(args.unresolvable_hosts_to_file)
+        parser.write_dns_record_export(args.unresolvable_hosts_to_file, args.no_dns_resolve)
 
 
 # }}}
