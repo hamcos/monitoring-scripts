@@ -242,11 +242,11 @@ class CsvToCheckMkConverter:
                         dns_record = None
 
                     if dns_record:
-                        logger.debug("Hostname {} is already resolvable.")
+                        logger.debug("Hostname {} is already resolvable.".format(hostname))
                     elif host_properties['ipaddress']:
                         writer.writerow([hostname, host_properties['ipaddress']])
                     else:
-                        logger.error("Hostname {} is not resolvable and no IP address was given.")
+                        logger.error("Hostname {} is not resolvable and no IP address was given.".format(hostname))
 
 
 # main {{{
