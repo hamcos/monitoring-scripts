@@ -282,7 +282,7 @@ if __name__ == '__main__':
     )
     args_parser.add_argument(
         'csv_file',
-        help=u"CSV host list file to import.",
+        help="CSV host list file to import.",
     )
     args_parser.add_argument(
         '-e', '--export-dir',
@@ -320,7 +320,7 @@ if __name__ == '__main__':
         '-l', '--list',
         action='store_true',
         default=False,
-        help=u"List hosts intended for the bulk import of WATO.",
+        help="List hosts intended for the bulk import of WATO.",
     )
 
     args = args_parser.parse_args()
