@@ -27,7 +27,7 @@
 Read CSV host list and create the hosts in Check_MK WATO.
 """
 
-__version__ = '0.7'
+__version__ = '0.8'
 
 # modules {{{
 # std {{{
@@ -35,6 +35,7 @@ import os
 import logging
 import csv
 import re
+import socket
 # }}}
 # }}}
 
@@ -159,10 +160,17 @@ class CsvToCheckMkConverter:
         for wato_foldername in self._folders:
             output += "\t{}:\n".format(wato_foldername)
             for hostname in sorted(self._folders[wato_foldername]):
-                output += "{}\n".format(hostname)
+                host_properties = self._folders[wato_foldername][hostname]
+                ip_address = ""
+                if host_properties['ipaddress']:
+                    ip_address = " -> {}".format(host_properties['ipaddress'])
+                output += "{}{}\n".format(
+                    hostname,
+                    ip_address,
+                )
         return output
 
-    def write_configuration(self, export_dir):
+    def write_configuration(self, export_dir, include_ip_address=True):
         for wato_foldername in self._folders:
             path = os.path.join(export_dir, wato_foldername)
             try:
@@ -181,7 +189,7 @@ class CsvToCheckMkConverter:
                     self.CMK_TAG_SEPARATOR + host_properties['host_tags'] if host_properties['host_tags'] else '',
                 )
                 host_attributes += self._get_host_attributes_string(host_properties)
-                if host_properties['ipaddress']:
+                if include_ip_address and host_properties['ipaddress']:
                     ips += "'{}': '{}',\n".format(
                         hostname,
                         host_properties['ipaddress']
@@ -218,6 +226,27 @@ class CsvToCheckMkConverter:
                 target_file.write('})\n\n')
 
             target_file.close()
+
+    def write_dns_import_file(self, filepath):
+        for wato_foldername in self._folders:
+
+            with open(filepath, 'w', newline='') as outcsv:
+                writer = csv.writer(outcsv)
+                writer.writerow(["FQDN", "IP"])
+
+                for hostname in sorted(self._folders[wato_foldername]):
+                    host_properties = self._folders[wato_foldername][hostname]
+                    try:
+                        dns_record = socket.gethostbyname(hostname)
+                    except socket.gaierror:
+                        dns_record = None
+
+                    if dns_record:
+                        logger.debug("Hostname {} is already resolvable.")
+                    elif host_properties['ipaddress']:
+                        writer.writerow([hostname, host_properties['ipaddress']])
+                    else:
+                        logger.error("Hostname {} is not resolvable and no IP address was given.")
 
 
 # main {{{
@@ -262,6 +291,16 @@ if __name__ == '__main__':
         default='/etc/check_mk/conf.d',
     )
     args_parser.add_argument(
+        '-u', '--unresolvable-hosts-to-file',
+        help="Test all hosts if they can be resolved to a network/IP address by the system"
+        " and write the hosts that could not be resolved into the given file as CSV."
+        " For each host, the FQDN and the IP address is written."
+        " If no IP address is given for a host then a error message is going to be printed."
+        " This parameter is intended for a list of hosts which contains hosts laking an DNS entry."
+        " The exported CSV file can then be used to import the missing records into the DNS."
+        " If this option is used, the IP address will not be included into the configuration for Check_MK."
+    )
+    args_parser.add_argument(
         '-w', '--wato-default-folder',
         help="Set a WATO default folder if non was specified for a given host.",
     )
@@ -304,6 +343,11 @@ if __name__ == '__main__':
     if args.list:
         print(parser.get_hosts())
     else:
-        parser.write_configuration(args.export_dir)
+        parser.write_configuration(args.export_dir, not args.unresolvable_hosts_to_file)
+
+    if args.unresolvable_hosts_to_file:
+        print(args.unresolvable_hosts_to_file)
+        parser.write_dns_import_file(args.unresolvable_hosts_to_file)
+
 
 # }}}
