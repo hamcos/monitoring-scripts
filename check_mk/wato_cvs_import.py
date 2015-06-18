@@ -42,7 +42,11 @@ import socket
 
 class CsvToCheckMkConverter:
     CMK_TAG_SEPARATOR = '|'
-    DEFAULT_HOST_TAGS = CMK_TAG_SEPARATOR.join(('wato', '/" + FOLDER_PATH + "/'))
+    DEFAULT_HOST_TAGS = CMK_TAG_SEPARATOR.join(
+        (
+            'wato', '/" + FOLDER_PATH + "/'
+        )
+    )
     KEYS_IN_HOST_ATTRIBUTES = [
         'alias',
         'ipaddress'
@@ -61,7 +65,12 @@ class CsvToCheckMkConverter:
         self._hostname_suffix = hostname_suffix
 
         if host_tags:
-            self._host_tags = self.CMK_TAG_SEPARATOR.join((host_tags, self.DEFAULT_HOST_TAGS))
+            self._host_tags = self.CMK_TAG_SEPARATOR.join(
+                (
+                    host_tags,
+                    self.DEFAULT_HOST_TAGS
+                )
+            )
         else:
             self._host_tags = self.DEFAULT_HOST_TAGS
 
@@ -129,7 +138,14 @@ class CsvToCheckMkConverter:
 
         self._folders[wato_foldername][hostname] = host_properties
 
-    def __get_host_property(self, host_property, prefix='', suffix='', default=None):
+    def __get_host_property(
+        self,
+        host_property,
+        prefix='',
+        suffix='',
+        default=None
+    ):
+
         if host_property in self.__row:
             return prefix + self.__row[host_property].strip() + suffix
         elif type(default) is str:
@@ -149,6 +165,11 @@ class CsvToCheckMkConverter:
                     host_property,
                     host_properties[host_property]
                 ))
+        if 'snmp-only' in host_properties['host_tags']:
+            host_attributes.append("'{}': u'{}'".format(
+                'tag_agent',
+                'snmp-only',
+            ))
 
         if len(host_attributes) > 0:
             return " '{}': {{{}}},\n".format(
@@ -197,7 +218,7 @@ class CsvToCheckMkConverter:
                     skip_properties=['' if include_ip_address else 'ipaddress'],
                 )
                 if include_ip_address and host_properties['ipaddress']:
-                    ips += "'{}': '{}',\n".format(
+                    ips += "'{}': u'{}',\n".format(
                         hostname,
                         host_properties['ipaddress']
                     )
@@ -253,7 +274,10 @@ class CsvToCheckMkConverter:
                     if dns_record:
                         logger.debug("Hostname {} is already resolvable.".format(hostname))
                     elif host_properties['ipaddress']:
-                        logger.debug("Write hostname/FQDN {} to {}".format(hostname, filepath))
+                        logger.debug("Write hostname/FQDN {} to {}".format(
+                            hostname,
+                            filepath
+                        ))
                         writer.writerow([hostname, host_properties['ipaddress']])
                     else:
                         logger.error("Hostname {} is not resolvable and no IP address was given.".format(hostname))
@@ -318,7 +342,7 @@ if __name__ == '__main__':
     )
     args_parser.add_argument(
         '-w', '--wato-default-folder',
-        help="Set a WATO default folder if non was specified for a given host.",
+        help="Set a WATO default folder if none was specified for a given host.",
     )
     args_parser.add_argument(
         '-s', '--hostname-suffix',
@@ -327,7 +351,8 @@ if __name__ == '__main__':
     )
     args_parser.add_argument(
         '-t', '--host-tags',
-        help="Append these tags to all hostnames. Use a pipe „{}“ as tag separator.".format(
+        help="Append these tags to all hostnames."
+        " Use a pipe „{}“ as tag separator.".format(
             CsvToCheckMkConverter.CMK_TAG_SEPARATOR
         ),
         default='',
@@ -359,10 +384,15 @@ if __name__ == '__main__':
     if args.list:
         print(parser.get_hosts())
     else:
-        parser.write_configuration(args.export_dir, not args.unresolvable_hosts_to_file)
+        parser.write_configuration(
+            args.export_dir,
+            not args.unresolvable_hosts_to_file
+        )
 
     if args.unresolvable_hosts_to_file:
-        parser.write_dns_record_export(args.unresolvable_hosts_to_file, args.no_dns_resolve)
-
+        parser.write_dns_record_export(
+            args.unresolvable_hosts_to_file,
+            args.no_dns_resolve
+        )
 
 # }}}
