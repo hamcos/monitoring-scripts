@@ -6,7 +6,7 @@ rem @license GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
 if exist "%programfiles%\check_mk\check_mk_agent.exe" goto ende
 if exist "%programfiles(x86)%\check_mk\check_mk_agent.exe" goto ende
 
-.\check-mk-agent-1.2.4p3.exe /S
+.\install_agent-64.exe /S
 rem .\install_agent-64.exe /S
 
 net stop Check_MK_Agent
