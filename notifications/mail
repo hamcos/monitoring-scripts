@@ -1,18 +1,55 @@
 #!/usr/bin/python
-# HTML Emails with included Graphs
-# This script creates a very beautiful mail in multipart format with
-# attached graphs and such neat stuff. Sweet!
+# HTML Email
+# Bulk: yes
+
+# +------------------------------------------------------------------+
+# |             ____ _               _        __  __ _  __           |
+# |            / ___| |__   ___  ___| | __   |  \/  | |/ /           |
+# |           | |   | '_ \ / _ \/ __| |/ /   | |\/| | ' /            |
+# |           | |___| | | |  __/ (__|   <    | |  | | . \            |
+# |            \____|_| |_|\___|\___|_|\_\___|_|  |_|_|\_\           |
+# |                                                                  |
+# | Copyright Mathias Kettner 2013             mk@mathias-kettner.de |
+# +------------------------------------------------------------------+
 #
-# Argument 1: Full system path to the pnp4nagios index.php for fetching
-#             the graphs. Usually auto configured in OMD.
-# Argument 2: HTTP-URL-Prefix to open multisite. When provided, several
-#             links are added to the mail.
+# This file is part of Check_MK.
+# The official homepage is at http://mathias-kettner.de/check_mk.
+#
+# check_mk is free software;  you can redistribute it and/or modify it
+# under the  terms of the  GNU General Public License  as published by
+# the Free Software Foundation in version 2.  check_mk is  distributed
+# in the hope that it will be useful, but WITHOUT ANY WARRANTY;  with-
+# out even the implied warranty of  MERCHANTABILITY  or  FITNESS FOR A
+# PARTICULAR PURPOSE. See the  GNU General Public License for more de-
+# ails.  You should have  received  a copy of the  GNU  General Public
+# License along with GNU Make; see the file  COPYING.  If  not,  write
+# to the Free Software Foundation, Inc., 51 Franklin St,  Fifth Floor,
+# Boston, MA 02110-1301 USA.
+
+
+# Argument 1: Full system path to the pnp4nagios index.php for fetching the graphs. Usually auto configured in OMD.
+# Argument 2: HTTP-URL-Prefix to open Multisite. When provided, several links are added to the mail.
+#             Example: http://myserv01/prod
+#
+# This script creates a nifty HTML email in multipart format with
+# attached graphs and such neat stuff. Sweet!
+
 
 import os, re, sys, subprocess
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.application import MIMEApplication
-from email.mime.image import MIMEImage
+
+try:
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+    from email.mime.application import MIMEApplication
+    from email.mime.image import MIMEImage
+except ImportError:
+    # python <2.5 compat
+    from email.MIMEMultipart import MIMEMultipart
+    from email.MIMEText import MIMEText
+    from email.MIMEImage import MIMEImage
+    from email.MIMEBase import MIMEBase
+    from email import Encoders
+    MIMEApplication = None
 
 tmpl_head_html = '''
 <html>
@@ -20,63 +57,54 @@ tmpl_head_html = '''
 <title>$SUBJECT$</title>
 <style>
 body {
-    background-color: #426D8A;
+    background-color: #ffffff;
     padding: 5px;
+    font-family: arial,helvetica,sans-serif;
+    font-size: 10px;
 }
-table.data {
+table {
     border-spacing: 0px;
-    margin: 0;
-    padding: 0;
     border-collapse: collapse;
-    empty-cells: show;
+    margin: 5px 0 0 0;
+    padding: 0;
     width: 100%;
-}
-
-table.data {
     color: black;
+    empty-cells: show;
 }
 
-table.data th {
+table th {
     font-weight: normal;
-    border-right: 1px solid #ccc;
-    background-color: #999;
+    border-right: 1px solid #cccccc;
+    background-color: #999999;
     text-align: center;
-    color: #fff;
+    color: #ffffff;
     vertical-align: middle;
     font-size: 9pt;
     height: 14px;
 }
-table.data th:last-child {
+table th:last-child {
     border-right-style: none;
 }
 
-table.data tr.data > td {
-    border-right: 1px solid #ccc;
+table tr > td {
+    border-right: 1px solid #cccccc;
     padding: 2px 4px;
     height: 22px;
     vertical-align: middle;
 }
-table.data tr.data td:last-child {
+table tr td:last-child {
     border-right-style: none;
 }
 
-table.data a {
+table a {
     text-decoration: none;
     color: black;
 }
-table.data a:hover {
+table a:hover {
     text-decoration: underline;
 }
 
-table.data.single {
-    margin-top: 5px;
-    border-spacing: 1px;
-    padding: 0;
-    border-collapse: collapse;
-    empty-cells: show;
-}
-
-table.data.single tr.data td {
+table tr td {
     padding-bottom: 4px;
     padding: 4px 5px 2px 5px;
     text-align: left;
@@ -85,186 +113,194 @@ table.data.single tr.data td {
     vertical-align: top;
     font-size: 9pt;
 }
-table.data.single tr.data td.left {
+table tr td.left {
     width: 10%;
     white-space: nowrap;
     vertical-align: top;
     padding-right: 20px;
 }
-table.data.single tr.even0 td.left {
-    background-color: #bbb;
+table tr.even0 td.left {
+    background-color: #bbbbbb;
 }
-table.data.single tr.odd0 td.left {
-    background-color: #ccc;
+table tr.odd0 td.left {
+    background-color: #cccccc;
 }
 
-tr.odd0  { background-color: #eee; }
-tr.even0 { background-color: #ddd; }
+tr.odd0  { background-color: #eeeeee; }
+tr.even0 { background-color: #dddddd; }
 
-td.odd0  { background-color: #eee; }
-td.even0 { background-color: #ddd; }
+td.odd0  { background-color: #eeeeee; }
+td.even0 { background-color: #dddddd; }
 
-tr.odd1  { background-color: #ffc; }
-tr.even1 { background-color: #ffa; }
+tr.odd1  { background-color: #ffffcc; }
+tr.even1 { background-color: #ffffaa; }
 
-tr.odd2  { background-color: #fcc; }
-tr.even2 { background-color: #faa; }
+tr.odd2  { background-color: #ffcccc; }
+tr.even2 { background-color: #ffaaaa; }
 
 tr.odd3  { background-color: #ffe0a0; }
 tr.even3 { background-color: #ffefaf; }
 
-td.state {
-    text-align: center;
+span.state {
+    padding-left: 3px;
+    padding-right: 3px;
+    border-radius: 2px;
     font-weight: bold;
 }
 
-/* OK/UP */
-.state0, .stateOK, .hstate0, .hstateUP, .state0 a, .hstate0 a {
-        background-color: #0b3; color: #fff;
+.stateOK, .stateUP {
+    background-color: #0b3; color: #ffffff;
 }
 
-.hstate {
-        white-space: nowrap;
-}
-/* WARN */
-.state1, .stateWARNING, .state1 a, tr.groupheader td.state1 {
-        background-color: #ff0; color: #000;
+.stateWARNING {
+    background-color: #ffff00; color: #000000;
 }
 
-/* CRIT/DOWN */
-.state2, .stateCRITICAL, .hstate1, .hstateDOWN, .state2 a, .hstate2 a {
-        background-color: #f00; color: #fff;
+.stateCRITICAL, .stateDOWN {
+    background-color: #ff0000; color: #ffffff;
 }
 
-/* UNKNOWN / UNREACH */
-.state3, .stateUNKNOWN, .hstate2, .hstateUNREACHABLE, .state3 a, .hstate2 a {
-        background-color: #f80; color: #fff;
+.stateUNKNOWN, .stateUNREACHABLE {
+    background-color: #ff8800; color: #ffffff;
 }
 
-/* PENDING */
-.statep, .statePENDING, .hstatep, .hstatePENDING, .statep a, .hstatep a {
-        background-color: #888; color: #fff;
+.statePENDING {
+    background-color: #888888; color: #ffffff;
 }
 
-/* in DOWNTIME */
-.stated, .stateDOWNTIME, .hstated, .hstateDOWNTIME, .stated a, .hstated a {
-        background-color: #0af; color: #fff;
+.stateDOWNTIME {
+    background-color: #00aaff; color: #ffffff;
 }
 
 td.graphs {
     width: 617px;
+    padding: 10px;
 }
 
-td.graphs img {
-    margin: 10px;
+img {
+    margin-right: 10px;
 }
+
+img.nofloat {
+    display: block;
+    margin-bottom: 10px;
+}
+
+table.context {
+    border-collapse: collapse;
+}
+
+table.context td {
+    border: 1px solid #888;
+    padding: 3px 8px;
+}
+
+
 </style>
 </head>
-<body>'''
+<body>
+<table>'''
 
-tmpl_foot_html = '''</body>
+tmpl_foot_html = '''</table>
+</body>
 </html>'''
 
-#
-# HOST TEMPLATES
-#
 
-tmpl_host_subject = 'Check_MK: $HOSTNAME$ - $NOTIFICATIONTYPE$'
+# Elements to be put into the mail body. Columns:
+# 1. Name
+# 2. "both": always, possible, "host": only for hosts, or "service": only for service notifications
+# 3. True -> always enabled, not configurable, False: optional
+# 4. Title
+# 5. Text template
+# 6. HTML template
 
-tmpl_host_txt = '''
-Host:     $HOSTNAME$ ($HOSTALIAS$)
-Address:  $HOSTADDRESS$
-$HOSTLINK$
-State:    $LASTHOSTSTATE$ -> $HOSTSTATE$ ($NOTIFICATIONTYPE$) since $LASTHOSTSTATECHANGE_REL$
-Output:   $HOSTOUTPUT$
-Perfdata: $HOSTPERFDATA$
-$LONGHOSTOUTPUT$
-'''
+body_elements = [
 
-tmpl_host_html = tmpl_head_html + '''
-<table class="data single">
-<tr class="data even0">
-    <th colspan=2>Object Information</th>
-</tr>
-<tr class="data odd0">
-    <td class=left>Name</td>
-    <td>$LINKEDHOSTNAME$ ($HOSTALIAS$)</td>
-</tr>
-<tr class="data even0">
-    <td class=left>Address</td>
-    <td>$HOSTADDRESS$</td>
-</tr>
-<tr>
-    <th colspan=2>State</th>
-</tr>
-<tr class="data odd0">
-    <td class=left>State</td>
-    <td class="state hstate">
-        <span class="hstate$LASTHOSTSTATE$">$LASTHOSTSTATE$>/span> &rarr;
-        <span class="hstate$HOSTSTATEID$">$HOSTSTATE$ ($NOTIFICATIONTYPE$)</span>
-        since $LASTHOSTSTATECHANGE_REL$
-    </td>
-</tr>
-<tr class="data even0">
-    <td class="left">Output</td>
-    <td>$HOSTOUTPUT$</td>
-</tr>
-$GRAPH_CODE$
-</table>''' + tmpl_foot_html
+  ( "hostname", "both", True, "Host",
+    "$HOSTNAME$ ($HOSTALIAS$)",
+    "$LINKEDHOSTNAME$ ($HOSTALIAS$)" ),
 
-#
-# SERVICE TEMPLATES
-#
+  ( "servicedesc", "service", True, "Service",
+    "$SERVICEDESC$",
+    "$SERVICEDESC$" ),
 
-tmpl_service_subject = 'Check_MK: $HOSTNAME$/$SERVICEDESC$ $NOTIFICATIONTYPE$'
+  ( "event", "both", True, "Event",
+    "$EVENT_TXT$",
+    "$EVENT_HTML$", ),
 
-tmpl_service_txt = '''
-Host:     $HOSTNAME$ ($HOSTALIAS$)
-Address:  $HOSTADDRESS$$HOSTLINK$
+  # Elements for both host and service notifications
+  ( "address",  "both", False, "Address",
+    "$HOSTADDRESS$",
+    "$HOSTADDRESS$", ),
 
-Service:  $SERVICEDESC$$SERVICELINK$
-State:    $LASTSERVICESTATE$ -> $SERVICESTATE$ ($NOTIFICATIONTYPE$) since $LASTSERVICESTATECHANGE_REL$
-Output:   $SERVICEOUTPUT$
-Perfdata: $SERVICEPERFDATA$
-$LONGSERVICEOUTPUT$
-'''
+  ( "abstime", "both", False, "Date / Time",
+    "$LONGDATETIME$",
+    "$LONGDATETIME$", ),
 
-tmpl_service_html = tmpl_head_html + '''
-<table class="data single">
-<tr class="data even0">
-    <th colspan=2>Object Information</th>
-</tr>
-<tr class="data odd0">
-    <td class=left>Hostname</td>
-    <td>$LINKEDHOSTNAME$ ($HOSTALIAS$)</td>
-</tr>
-<tr class="data even0">
-    <td class=left>Address</td>
-    <td>$HOSTADDRESS$</td>
-</tr>
-<tr class="data odd0">
-    <td class=left>Service description</td>
-    <td>$LINKEDSERVICEDESC$</td>
-</tr>
-<tr>
-    <th colspan=2>State</th>
-</tr>
-<tr class="data odd0">
-    <td class=left>State</td>
-    <td class="state svcstate">
-        <span class="state$LASTSERVICESTATE$">$LASTSERVICESTATE$</span> &rarr;
-        <span class="state$SERVICESTATEID$">$SERVICESTATE$ ($NOTIFICATIONTYPE$)</span>
-        since $LASTSERVICESTATECHANGE_REL$
-    </td>
-</tr>
-<tr class="data even0">
-    <td class="left">Output</td>
-    <td>$SERVICEOUTPUT$</td>
-</tr>
-$GRAPH_CODE$
-''' + tmpl_foot_html
+  # Elements only for host notifications
+  ( "reltime", "host", False, "Relative Time",
+    "$LASTHOSTSTATECHANGE_REL$",
+    "$LASTHOSTSTATECHANGE_REL$",),
+
+  ( "output", "host", True, "Plugin Output",
+    "$HOSTOUTPUT$",
+    "$HOSTOUTPUT$",),
+
+  ( "ack_author", "host", False, "Acknowledge Author",
+    "$HOSTACKAUTHORNAME$",
+    "$HOSTACKAUTHORNAME$",),
+
+  ( "ack_comment", "host", False, "Acknowledge Comment",
+    "$HOSTACKCOMMENT$",
+    "$HOSTACKCOMMENT$",),
+
+  ( "perfdata", "host", False, "Performance Data",
+    "$HOSTPERFDATA$",
+    "$HOSTPERFDATA$",),
+
+
+  # Elements only for service notifications
+  ( "reltime", "service", False, "Relative Time",
+    "$LASTSERVICESTATECHANGE_REL$",
+    "$LASTSERVICESTATECHANGE_REL$",),
+
+  ( "output", "service", True, "Plugin Output",
+    "$SERVICEOUTPUT$",
+    "$SERVICEOUTPUT$",),
+
+  ( "longoutput", "service", False, "Additional Output",
+    "$LONGSERVICEOUTPUT$",
+    "$LONGSERVICEOUTPUT$",),
+
+  ( "ack_author", "service", False, "Acknowledge Author",
+    "$SERVICEACKAUTHOR$",
+    "$SERVICEACKAUTHOR$",),
+
+  ( "ack_comment", "service", False, "Acknowledge Comment",
+    "$SERVICEACKCOMMENT$",
+    "$SERVICEACKCOMMENT$",),
+
+  ( "perfdata", "service", False, "Performance Data",
+    "$HOSTPERFDATA$",
+    "$HOSTPERFDATA$",),
+
+  ( "perfdata", "service", False, "Performance Data",
+    "$SERVICEPERFDATA$",
+    "$SERVICEPERFDATA$",),
+
+  # Debugging
+  ( "context", "both", False, "Complete variable list",
+    "$CONTEXT_ASCII$",
+    "$CONTEXT_HTML$",
+  )
+]
+
+tmpl_host_subject = 'Check_MK: $HOSTNAME$ - $EVENT_TXT$'
+tmpl_service_subject = 'Check_MK: $HOSTNAME$/$SERVICEDESC$ $EVENT_TXT$'
+
 
 opt_debug = '-d' in sys.argv
+bulk_mode = '--bulk' in sys.argv
 
 class GraphException(Exception):
     pass
@@ -274,22 +310,33 @@ def substitute_context(template, context):
     for varname, value in context.items():
         template = template.replace('$'+varname+'$', value)
 
+    # Debugging of variables. Create content only on demand
+    if "$CONTEXT_ASCII$" in template or "$CONTEXT_HTML$" in template:
+        template = replace_variable_context(template, context)
+
     # Remove the rest of the variables and make them empty
     template = re.sub("\$[A-Z_][A-Z_0-9]*\$", "", template)
     return template
 
-def prepare_contents(context):
-    if context['WHAT'] == 'HOST':
-        tmpl_txt  = tmpl_host_txt
-        tmpl_html = tmpl_host_html
-    else:
-        tmpl_txt  = tmpl_service_txt
-        tmpl_html = tmpl_service_html
 
-    return substitute_context(tmpl_txt, context), \
-           substitute_context(tmpl_html, context)
+def replace_variable_context(template, context):
+    ascii_output = ""
+    html_output = "<table class=context>\n"
+    elements = context.items()
+    elements.sort()
+    for varname, value in elements:
+        ascii_output += "%s=%s\n" % (varname, value)
+        html_output += "<tr><td class=varname>%s</td><td class=value>%s</td></tr>\n" % (
+            varname, encode_entities(value))
+    html_output += "</table>\n"
+    return template.replace("$CONTEXT_ASCII$", ascii_output).replace("$CONTEXT_HTML$", html_output)
 
-def multipart_mail(target, subject, content_txt, content_html, attach = []):
+
+def encode_entities(text):
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def multipart_mail(target, subject, from_address, reply_to, content_txt, content_html, attach = []):
     m = MIMEMultipart('related', _charset='utf-8')
 
     alt = MIMEMultipart('alternative')
@@ -309,7 +356,14 @@ def multipart_mail(target, subject, content_txt, content_html, attach = []):
         if what == 'img':
             part = MIMEImage(contents, name = name)
         else:
-            part = MIMEApplication(contents, name = name)
+            if MIMEApplication != None:
+                part = MIMEApplication(contents, name = name)
+            else:
+                # python <2.5 compat
+                part = MimeBase('application', 'octet-stream')
+                part.set_payload(contents)
+                Encoders.encode_base64(part)
+
         part.add_header('Content-ID', '<%s>' % name)
         # how must be inline or attachment
         part.add_header('Content-Disposition', how, filename = name)
@@ -318,69 +372,93 @@ def multipart_mail(target, subject, content_txt, content_html, attach = []):
     m['Subject'] = subject
     m['To']      = target
 
+    # Set a few configurable headers
+    if from_address:
+        m['From'] = from_address
+
+    if reply_to:
+        m['Reply-To'] = reply_to
+
+
+
     return m
 
-def send_mail(m, target):
-    p = subprocess.Popen(["/usr/sbin/sendmail", "-i", target ], stdin = subprocess.PIPE)
+def send_mail(m, target, from_address):
+    cmd = ["/usr/sbin/sendmail"]
+    if from_address:
+        cmd += ['-f', from_address]
+    cmd += [ "-i", target]
+    p = subprocess.Popen(cmd, stdin = subprocess.PIPE)
     p.communicate(m.as_string())
     return True
 
 def fetch_pnp_data(context, params):
     try:
         # Autodetect the path in OMD environments
-        path = "%s/share/pnp4nagios/htdocs/index.php" % context['OMD_ROOT']
+        path = "%s/share/pnp4nagios/htdocs/index.php" % context['OMD_ROOT'].encode('utf-8')
+        php_save_path = "-d session.save_path=%s/tmp/php/session" % context['OMD_ROOT'].encode('utf-8')
+        env = 'REMOTE_USER="check-mk" SKIP_AUTHORIZATION=1'
     except:
         # Non-omd environment - use plugin argument 1
         path = context.get('PARAMETER_1', '')
+        php_save_path = "" # Using default path
+        skip_authorization = False
+        env = 'REMOTE_USER="%s"' % context['CONTACTNAME'].encode('utf-8')
 
     if not os.path.exists(path):
         raise GraphException('Unable to locate pnp4nagios index.php (%s)' % path)
 
-    return os.popen('REMOTE_USER="%s" php %s "%s"' %  (context['CONTACTNAME'], path, params)).read()
+    return os.popen('%s php %s %s "%s"' % (env, php_save_path, path, params)).read()
 
 def fetch_num_sources(context):
     svc_desc = context['WHAT'] == 'HOST' and '_HOST_' or context['SERVICEDESC']
     infos = fetch_pnp_data(context, '/json?host=%s&srv=%s&view=0' %
-                                     (context['HOSTNAME'], svc_desc))
+                                     (context['HOSTNAME'].encode('utf-8'), svc_desc.encode('utf-8')))
     if not infos.startswith('[{'):
-        raise GraphException('Unable to fetch graph infos, got: "%s"' % infos)
+        raise GraphException('Unable to fetch graph infos: %s' % extract_graph_error(infos))
 
     return infos.count('source=')
 
 def fetch_graph(context, source, view = 1):
     svc_desc = context['WHAT'] == 'HOST' and '_HOST_' or context['SERVICEDESC']
     graph = fetch_pnp_data(context, '/image?host=%s&srv=%s&view=%d&source=%d' %
-                                    (context['HOSTNAME'], svc_desc, view, source))
+                                    (context['HOSTNAME'], svc_desc.encode('utf-8'), view, source))
 
     if graph[:8] != '\x89PNG\r\n\x1a\n':
-        raise GraphException('Unable to fetch the graph, got: "%s"' % graph)
+        raise GraphException('Unable to fetch the graph: %s' % extract_graph_error(graph))
 
     return graph
 
-def main():
-    # gather all options from env
-    context = dict([
-        (var[7:], value.decode("utf-8"))
-        for (var, value)
-        in os.environ.items()
-        if var.startswith("NOTIFY_")])
+def extract_graph_error(output):
+    lines = output.splitlines()
+    for nr, line in enumerate(lines):
+        if "Please check the documentation for information about the following error" in line:
+            return lines[nr+1]
+    return output
 
-    print repr(context)
 
-    # Fetch graphs for this object. It first tries to detect how many sources
-    # are available for this object. Then it loops through all sources and
-    # fetches retrieves the images. If a problem occurs, it is printed to
-    # stderr (-> notify.log) and the graph is not added to the mail.
-    try:
-        num_sources = fetch_num_sources(context)
-    except GraphException, e:
-        sys.stderr.write('Unable to fetch graph infos: %s\n' % e)
-        num_sources = 0
+def construct_content(context):
+    # A list of optional information is configurable via the parameter "elements"
+    # (new configuration style)
+    if "PARAMETER_ELEMENTS" in context:
+        elements = context["PARAMETER_ELEMENTS"].split()
+    else:
+        elements = [ "perfdata", "graph", "abstime", "address", "longoutput" ]
 
-    # If argument 2 is given, we know the base url to the installation and can add
+    # If argument 2 is given (old style) or the parameter url_prefix is set (new style),
+    # we know the base url to the installation and can add
     # links to hosts and services. ubercomfortable!
     if context.get('PARAMETER_2'):
-        base_url = context['PARAMETER_2'].rstrip('/')
+        url_prefix = context["PARAMETER_2"]
+    elif context.get("PARAMETER_URL_PREFIX"):
+        url_prefix = context["PARAMETER_URL_PREFIX"]
+    else:
+        url_prefix = None
+
+    if url_prefix:
+        base_url = url_prefix.rstrip('/')
+        if base_url.endswith("/check_mk"):
+            base_url = base_url[:-9]
         host_url = base_url + context['HOSTURL']
 
         context['LINKEDHOSTNAME'] = '<a href="%s">%s</a>' % (host_url, context['HOSTNAME'])
@@ -392,50 +470,219 @@ def main():
             context['SERVICELINK']       = '\nLink:     %s' % service_url
     else:
         context['LINKEDHOSTNAME']    = context['HOSTNAME']
-        context['LINKEDSERVICEDESC'] = context['SERVICEDESC']
+        context['LINKEDSERVICEDESC'] = context.get('SERVICEDESC', '')
         context['HOSTLINK']          = ''
         context['SERVICELINK']       = ''
 
-    attachments = []
-    graph_code = ''
-    for source in range(0, num_sources):
-        try:
-            content = fetch_graph(context, source)
-        except GraphException, e:
-            sys.stderr.write('Unable to fetch graph: %s\n' % e)
-            continue
+    # Create a notification summary in a new context variable
+    # Note: This code could maybe move to cmk --notify in order to
+    # make it available every in all notification scripts
+    # We have the following types of notifications:
 
-        if context['WHAT'] == 'HOST':
-            svc_desc = '_HOST_'
+    # - Alerts                OK -> CRIT
+    #   NOTIFICATIONTYPE is "PROBLEM" or "RECOVERY"
+
+    # - Flapping              Started, Ended
+    #   NOTIFICATIONTYPE is "FLAPPINGSTART" or "FLAPPINGSTOP"
+
+    # - Downtimes             Started, Ended, Cancelled
+    #   NOTIFICATIONTYPE is "DOWNTIMESTART", "DOWNTIMECANCELLED", or "DOWNTIMEEND"
+
+    # - Acknowledgements
+    #   NOTIFICATIONTYPE is "ACKNOWLEDGEMENT"
+
+    # - Custom notifications
+    #   NOTIFICATIONTYPE is "CUSTOM"
+
+    html_info = ""
+    html_state = '<span class="state state$@STATE$">$@STATE$</span>'
+    notification_type = context["NOTIFICATIONTYPE"]
+    if notification_type in [ "PROBLEM", "RECOVERY" ]:
+        txt_info = "$PREVIOUS@HARDSHORTSTATE$ -> $@SHORTSTATE$"
+        html_info = '<span class="state state$PREVIOUS@HARDSTATE$">$PREVIOUS@HARDSTATE$</span> &rarr; ' + \
+                    html_state
+
+    elif notification_type.startswith("FLAP"):
+        if "START" in notification_type:
+            txt_info = "Started Flapping"
         else:
-            svc_desc = context['SERVICEDESC'].replace(' ', '_')
-        name = '%s-%s-%d.png' % (context['HOSTNAME'], svc_desc, source)
+            txt_info = "Stopped Flapping ($@SHORTSTATE$)"
+            html_info = "Stopped Flapping (while " + html_state + ")"
 
-        attachments.append(('img', name, content, 'inline'))
+    elif notification_type.startswith("DOWNTIME"):
+        what = notification_type[8:].title()
+        txt_info = "Downtime " + what + " ($@SHORTSTATE$)"
+        html_info = "Downtime " + what + " (while " + html_state + ")"
 
-        context['GRAPH_%d' % source] = name
-        graph_code += '<img src="cid:%s" />' % name
+    elif notification_type == "ACKNOWLEDGEMENT":
 
-    if graph_code:
-        context['GRAPH_CODE'] = (
-            '<tr><th colspan=2>Graphs</th></tr>'
-            '<tr class="data even0"><td colspan=2 class=graphs>%s</td></tr>' % graph_code
-        )
+        txt_info = "Acknowledged ($@SHORTSTATE$)"
+        html_info = "Acknowledged (while " + html_state + ")"
+
+    elif notification_type == "CUSTOM":
+        txt_info = "Custom Notification ($@SHORTSTATE$)"
+        html_info = "Custom Notification (while " + html_state + ")"
+
     else:
-        context['GRAPH_CODE'] = ''
+        txt_info = notification_type # Should neven happen
+
+    if not html_info:
+        html_info = txt_info
+
+    txt_info = substitute_context(txt_info.replace("@", context["WHAT"]), context)
+    html_info = substitute_context(html_info.replace("@", context["WHAT"]), context)
+
+    context["EVENT_TXT"] = txt_info
+    context["EVENT_HTML"] = html_info
+
+    attachments = []
 
     # Compute the subject of the mail
     if context['WHAT'] == 'HOST':
-        context['SUBJECT'] = substitute_context(tmpl_host_subject, context)
+        tmpl = context.get('PARAMETER_HOST_SUBJECT') or tmpl_host_subject
+        context['SUBJECT'] = substitute_context(tmpl, context)
     else:
-        context['SUBJECT'] = substitute_context(tmpl_service_subject, context)
+        tmpl = context.get('PARAMETER_SERVICE_SUBJECT') or tmpl_service_subject
+        context['SUBJECT'] = substitute_context(tmpl, context)
 
     # Prepare the mail contents
-    content_txt, content_html = prepare_contents(context)
+    content_txt, content_html = render_elements(context, elements)
+
+    # Add PNP Graph
+    if "graph" in elements:
+        # Fetch graphs for this object. It first tries to detect how many sources
+        # are available for this object. Then it loops through all sources and
+        # fetches retrieves the images. If a problem occurs, it is printed to
+        # stderr (-> notify.log) and the graph is not added to the mail.
+        try:
+            num_sources = fetch_num_sources(context)
+        except GraphException, e:
+            graph_error = extract_graph_error(str(e))
+            if '.xml" not found.' not in graph_error:
+                sys.stderr.write('Unable to fetch number of graphs: %s\n' % graph_error)
+            num_sources = 0
+
+        graph_code = ''
+        for source in range(0, num_sources):
+            try:
+                content = fetch_graph(context, source)
+            except GraphException, e:
+                sys.stderr.write('Unable to fetch graph: %s\n' % e)
+                continue
+
+            if context['WHAT'] == 'HOST':
+                svc_desc = '_HOST_'
+            else:
+                svc_desc = context['SERVICEDESC'].replace(' ', '_')
+                # replace forbidden windows characters < > ? " : | \ / *
+                for token in ["<", ">", "?", "\"", ":", "|", "\\", "/", "*"] :
+                    svc_desc = svc_desc.replace(token, "x%s" % ord(token))
+            name = '%s-%s-%d.png' % (context['HOSTNAME'], svc_desc, source)
+
+            attachments.append(('img', name, content, 'inline'))
+            cls = ''
+            if context.get('PARAMETER_NO_FLOATING_GRAPHS'):
+                cls = ' class="nofloat"'
+            graph_code += '<img src="cid:%s"%s />' % (name, cls)
+
+        if graph_code:
+            content_html += (
+                '<tr><th colspan=2>Graphs</th></tr>'
+                '<tr class="even0"><td colspan=2 class=graphs>%s</td></tr>' % graph_code
+            )
+
+    content_html = substitute_context(tmpl_head_html, context) + \
+                   content_html + \
+                   substitute_context(tmpl_foot_html, context)
+
+    return content_txt, content_html, attachments
+
+def render_elements(context, elements):
+    what = context['WHAT'].lower()
+    even = "even"
+    tmpl_txt = ""
+    tmpl_html = ""
+    for name, whence, forced, title, txt, html in body_elements:
+        if (whence == "both" or whence == what) and \
+            (forced or name in elements):
+            tmpl_txt += "%-20s %s\n" % (title + ":", txt)
+            tmpl_html += '<tr class="%s0"><td class=left>%s</td><td>%s</td></tr>' % (
+                    even, title, html)
+            even = even == "even" and "odd" or "even"
+
+    return substitute_context(tmpl_txt, context), \
+           substitute_context(tmpl_html, context)
+
+
+def read_bulk_contexts():
+    parameters = {}
+    contexts = []
+    in_params = True
+
+    # First comes a section with global variables
+    for line in sys.stdin:
+        line = line.strip()
+        if line:
+            key, value = line.split("=", 1)
+            value = value.replace("\1", "\n")
+            if in_params:
+                parameters[key] = value
+            else:
+                context[key] = value
+
+        else:
+            in_params = False
+            context = {}
+            contexts.append(context)
+
+    return parameters, contexts
+
+def main():
+    if bulk_mode:
+        attachments = []
+        content_txt = ""
+        content_html = ""
+        parameters, contexts = read_bulk_contexts()
+        hosts = set([])
+        for context in contexts:
+            context.update(parameters)
+            txt, html, att = construct_content(context)
+            content_txt += txt
+            content_html += html
+            attachments += att
+            mailto = context['CONTACTEMAIL'] # Assume the same in each context
+            subject = context['SUBJECT']
+            hosts.add(context["HOSTNAME"])
+
+        # Create a useful subject
+        hosts = list(hosts)
+        if len(contexts) > 1:
+            if len(hosts) == 1:
+                subject = "Check_MK: %d notifications for %s" % (len(contexts), hosts[0])
+            else:
+                subject = "Check_MK: %d notifications for %d hosts" % (
+                    len(contexts), len(hosts))
+
+    else:
+        # gather all options from env
+        context = dict([
+            (var[7:], value.decode("utf-8"))
+            for (var, value)
+            in os.environ.items()
+            if var.startswith("NOTIFY_")])
+        content_txt, content_html, attachments = construct_content(context)
+        mailto = context['CONTACTEMAIL']
+        subject = context['SUBJECT']
+
+    if not mailto: # e.g. empty field in user database
+        sys.stdout.write("Cannot send HTML email: empty destination email address")
+        sys.exit(2)
+
 
     # Create the mail and send it
-    m = multipart_mail(context['CONTACTEMAIL'], context['SUBJECT'], content_txt,
-                       content_html, attachments)
-    send_mail(m, context['CONTACTEMAIL'])
+    from_address = context.get("PARAMETER_FROM")
+    reply_to = context.get("PARAMETER_REPLY_TO")
+    m = multipart_mail(mailto, subject, from_address, reply_to, content_txt, content_html, attachments)
+    send_mail(m, mailto, from_address)
 
 main()

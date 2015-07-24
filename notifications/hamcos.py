@@ -19,8 +19,12 @@ def exit_if_hosttag():
                 if not re.search(r'\s%s\s' % tag, hosttags):
                     os._exit(0)
 
-def return_criti():
+def get_criticality():
     """ Returns list with acronym and expanded form """
     for tag in os.environ['NOTIFY_HOSTTAGS'].split():
         if tag in criticality:
             return criticality[tag]
+
+## Legacy
+def return_criti():
+    return get_criticality()

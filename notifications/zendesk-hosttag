@@ -1,0 +1,151 @@
+#!/usr/bin/env python
+# Zendesk issue only if all given tags match
+# You can specify host tags as plugin arguments. In this case the notification
+# will only be executed if the host has all host tags.
+# @author Robin Schneider <robin.schneider@hamcos.de>
+# @company hamcos IT Service GmbH http://www.hamcos.de
+# @license AGPLv3 <https://www.gnu.org/licenses/agpl-3.0.html>
+#
+# ToDo:
+# Put configuration in ini file.
+
+from __future__ import print_function
+
+import sys
+import os
+import re
+
+from hamcos import get_criticality, exit_if_hosttag
+from zdesk import Zendesk
+
+from pprint import pprint
+
+url_prefix = 'https://example.de'
+mon_conf_host_url = url_prefix + '/check_mk/index.py?start_url=%2Fcheck_mk%2Fview.py%3Fview_name%3Dhost%26host%3D'
+
+exit_if_hosttag()
+try:
+    import zdeskcfg
+
+    zendesk = Zendesk(**zdeskcfg.get_ini_config(config=u"/etc/check_mk/zehdesk.cfg"))
+except:
+    raise('Could not load configuration.')
+
+# print(zendesk.tickets_list())
+
+# Templates {{{
+def prepare_contents(context):
+    if context['WHAT'] == 'HOST':
+        tmpl_txt  = tmpl_host_txt
+    else:
+        tmpl_txt  = tmpl_service_txt
+
+    return substitute_context(tmpl_txt, context)
+
+def substitute_context(template, context):
+    # First replace all known variables
+    for varname, value in context.items():
+        template = template.replace('$'+varname+'$', value)
+
+    # Remove the rest of the variables and make them empty
+    template = re.sub("\$[A-Z_][A-Z_0-9]*\$", "", template)
+    return template
+
+tmpl_host_subject = '$HOSTNAME$ - $NOTIFICATIONTYPE$ ({})'.format(
+    get_criticality()[1],
+)
+
+tmpl_host_txt = '''Host:     $HOSTNAME$ ($HOSTALIAS$)
+Address:  $HOSTADDRESS$
+State:    $HOSTSTATE$ ($NOTIFICATIONTYPE$)
+
+Output:   $HOSTOUTPUT$
+Perfdata: $HOSTPERFDATA$
+$LONGHOSTOUTPUT$
+
+Hosttags: $HOSTTAGS$
+
+Host URL: {}$HOSTFORURL$
+'''.format(
+    mon_conf_host_url,
+)
+
+#
+# SERVICE TEMPLATES
+#
+
+tmpl_service_subject = '$HOSTNAME$/$SERVICEDESC$ $NOTIFICATIONTYPE$ ({})'.format(
+    get_criticality()[1],
+)
+
+tmpl_service_txt = '''Host:     $HOSTNAME$ ($HOSTALIAS$)
+Address:  $HOSTADDRESS$
+Service:  $SERVICEDESC$
+State:    $SERVICESTATE$ ($NOTIFICATIONTYPE$)
+
+Output:   $SERVICEOUTPUT$
+Perfdata: $SERVICEPERFDATA$
+$LONGSERVICEOUTPUT$
+
+Hosttags: $HOSTTAGS$
+
+Host URL: {}$HOSTFORURL$
+'''.format(
+    mon_conf_host_url,
+)
+# }}}
+
+# gather all options from env
+context = dict([
+    (var[7:], value.decode("utf-8"))
+    for (var, value)
+    in os.environ.items()
+    if var.startswith("NOTIFY_")])
+# pprint(context)
+
+
+# Compute the subject of the mail
+if context['WHAT'] == 'HOST':
+    subject = substitute_context(tmpl_host_subject, context)
+    crici_state = True if context['HOSTSTATE'] == 'CRITICAL' else False
+else:
+    subject = substitute_context(tmpl_service_subject, context)
+    crici_state = True if context['SERVICESTATE'] == 'CRITICAL' else False
+
+message = prepare_contents(context)
+
+# print(zendesk.groups_list())
+
+# Create
+new_ticket = {
+    'ticket': {
+        'subject': subject,
+        'description': message,
+        # 'tags': ['test'],
+        'group_id': 24480491,
+        'type': 'problem',
+        # 'priority': 'urgent',
+        # 'priority': 'high',
+        'priority': 'high' if get_criticality()[0] == 'GK' else 'normal',
+        # 'priority': 'low',
+        'custom_fields': [
+            {
+                'id': 27275821,
+                'value': os.environ['NOTIFY_HOSTNAME'],
+            },
+            {
+                'id': 27310892,
+                'value': os.environ['NOTIFY_HOSTADDRESS'],
+            },
+        ],
+    }
+}
+# pprint(new_ticket)
+# print()
+
+# If a response results in returning a [location] header, then that
+# will be what is returned.
+# Create a ticket and get its URL.
+
+result = zendesk.ticket_create(data=new_ticket)
+# print(result)
