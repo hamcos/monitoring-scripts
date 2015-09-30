@@ -2,7 +2,9 @@ rem @author Alexander Zell <alexander.zell@hamcos.de>
 rem @maintainer Robin Schneider <robin.schneider@hamcos.de>
 rem @company hamcos IT Service GmbH http://www.hamcos.de
 rem @license GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
-rem Download agent from http://mathias-kettner.de/check_mk_download_source.html
+rem To download the setup file, run https://github.com/hamcos/monitoring-scripts/blob/master/check_mk/Makefile
+
+rem This script is only needed if you do not use configuration management (which you should use).
 
 if exist "%programfiles%\check_mk\check_mk_agent.exe" goto ende
 if exist "%programfiles(x86)%\check_mk\check_mk_agent.exe" goto ende
