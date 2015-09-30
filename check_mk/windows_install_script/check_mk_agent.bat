@@ -9,20 +9,22 @@ rem This script is only needed if you do not use configuration management (which
 if exist "%programfiles%\check_mk\check_mk_agent.exe" goto ende
 if exist "%programfiles(x86)%\check_mk\check_mk_agent.exe" goto ende
 
-.\install_agent-64.exe /S
+.\install_agent-64.exe install
 rem .\install_agent-64.exe /S
 
 net stop Check_MK_Agent
 
 if exist "%programfiles(x86)%" goto x64
+mkdir "%programfiles%\check_mk"
 copy .\check_mk.ini "%programfiles%\check_mk\check_mk.ini" /y
-netsh advfirewall firewall add rule name="Check_MK_Agent" dir=in action=allow program="%programfiles%\check_mk\check_mk_agent.exe" enable=yes
+netsh advfirewall firewall add rule name="Check_MK_Agent" dir=in action=allow protocol=TCP localport=6556 enable=yes
 net start Check_MK_Agent
 goto ende
 
 :x64
+mkdir "%programfiles(x86)%\check_mk"
 copy .\check_mk.ini "%programfiles(x86)%\check_mk\check_mk.ini" /y
-netsh advfirewall firewall add rule name="Check_MK_Agent" dir=in action=allow program="%programfiles(x86)%\check_mk\check_mk_agent.exe" enable=yes
+netsh advfirewall firewall add rule name="Check_MK_Agent" dir=in action=allow protocol=TCP localport=6556 enable=yes
 net start Check_MK_Agent
 goto ende
 
