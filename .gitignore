@@ -2,3 +2,4 @@
 .ropeproject/
 *.tar.gz
 *.pyc
+check_mk/check_mk-*
