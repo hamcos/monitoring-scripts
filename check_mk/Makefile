@@ -20,8 +20,8 @@ check_mk-%: check_mk-%.tar.gz
 
 check_mk-$(VERSION)/windows:
 
-check_mk-%/windows: check_mk-%
-	cd "$(shell dirname $@)" && tar xzf agents.tar.gz
+check_mk-%/windows/check_mk_agent-64.exe: check_mk-%/agents.tar.gz
+	cd "$(@:%/windows/check_mk_agent-64.exe=%)" && tar xzf agents.tar.gz
 
 windows_install_script/install_agent-64.exe: check_mk-$(VERSION)/windows/check_mk_agent-64.exe
 	cp "$<" "$@"
