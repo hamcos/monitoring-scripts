@@ -115,10 +115,13 @@ class CsvToCheckMkConverter:
                 " Either specify it in the CSV file or use the parameter "
             )
 
-        hostname = self.__row['hostname'] + self._hostname_suffix
+        hostname = re.sub(
+            r'[^\w_-]', '_',
+            self.__row['hostname']
+        ) + self._hostname_suffix
         self._folders.setdefault(wato_foldername, {})
         host_properties = {
-            'hostname':   self.__row['hostname'] + self._hostname_suffix,
+            'hostname':   hostname,
             'alias':      self.__get_host_property('host_alias'),
             'ipaddress':  self.__get_host_property('ipaddress'),
             'host_tags':  self.__get_host_property('host_tags', default=''),
