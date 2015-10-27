@@ -341,7 +341,8 @@ if __name__ == '__main__':
         '-n', '--no-dns-resolve',
         action='store_true',
         default=False,
-        help="Do not check if the host is already resolvable via DNS. See -u.",
+        help="Do not check if the host is already resolvable via DNS"
+        " and write all FQDN/IP pairs to the file specified by --unresolvable-hosts-to-file.",
     )
     args_parser.add_argument(
         '-w', '--wato-default-folder',
