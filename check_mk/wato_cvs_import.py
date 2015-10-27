@@ -116,7 +116,7 @@ class CsvToCheckMkConverter:
             )
 
         hostname = re.sub(
-            r'[^\w_-]', '_',
+            r'[^\w_.-]', '_',
             self.__row['hostname']
         ) + self._hostname_suffix
         self._folders.setdefault(wato_foldername, {})
