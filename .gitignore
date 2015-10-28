@@ -1,6 +1,5 @@
 
 .ropeproject/
 *.tar.gz
-*.msi
 *.pyc
 check_mk/check_mk-*

@@ -9,7 +9,9 @@ copy-agent: windows_install_script/check_mk_agent.exe \
 	windows_install_script/check_mk_agent-64.exe \
 	windows_install_script/check_mk_agent.msi \
 	windows_install_script/install_agent.exe \
-	windows_install_script/install_agent-64.exe
+	windows_install_script/install_agent-64.exe \
+	windows_install_script/mrpe/ \
+	windows_install_script/plugins/
 
 clean:
 	rm -rf check_mk-*
@@ -30,4 +32,4 @@ check_mk-%/windows/check_mk_agent-64.exe: check_mk-%/agents.tar.gz
 	cd "$(@:%/windows/check_mk_agent-64.exe=%)" && tar xzf agents.tar.gz
 
 windows_install_script/%: check_mk-$(VERSION)/windows/%
-	cp "$<" "$@"
+	cp -r "$<" "$@"
