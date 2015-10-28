@@ -180,7 +180,9 @@ class CsvToCheckMkConverter:
                 ','.join(host_attributes),
             )
         else:
-            return ''
+            return " '{}': {{}}, # needed for WATO\n".format(
+                host_properties['hostname'],
+            )
 
     def get_hosts(self):
         output = ""
