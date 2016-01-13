@@ -202,9 +202,9 @@ class CsvToCheckMkConverter:
     def write_configuration(self, export_dir, include_ip_address=True):
         logger.debug(include_ip_address)
         for wato_foldername in self._folders:
-            path = os.path.join(export_dir, wato_foldername)
+            config_dir = os.path.join(export_dir, wato_foldername)
             try:
-                os.makedirs(path)
+                os.makedirs(config_dir)
             except os.error:
                 pass
                 # logger.debug("Could not create directory for {}: {}".format(wato_foldername, err))
@@ -233,7 +233,15 @@ class CsvToCheckMkConverter:
                         hostname,
                     ))
 
-            config_file = os.path.join(export_dir, wato_foldername, 'hosts.mk')
+            config_file = os.path.join(config_dir, 'hosts.mk')
+            wato = open(os.path.join(config_dir, '.wato'), 'w')
+            wato.write(
+                "{'attributes': {}, 'num_hosts': %d, 'title': u'%s'}\n" % (
+                    len(self._folders[wato_foldername]),
+                    wato_foldername.split(r'/')[-1],
+                )
+            )
+            wato.close()
             logger.info("Writing configuration file: {}".format(config_file))
             target_file = open(config_file, 'w')
             target_file.write('# Written by {}\n'.format(os.path.basename(__file__)))
@@ -259,6 +267,7 @@ class CsvToCheckMkConverter:
                 target_file.write('})\n\n')
 
             target_file.close()
+
 
     def write_dns_record_export(self, filepath, do_not_resolve_hostname):
         with open(filepath, 'w', newline='') as outcsv:
