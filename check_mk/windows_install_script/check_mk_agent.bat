@@ -3,10 +3,22 @@
 rem @author Alexander Zell <alexander.zell@hamcos.de>
 rem @maintainer Robin Schneider <robin.schneider@hamcos.de>
 rem @company hamcos IT Service GmbH http://www.hamcos.de
-rem @license GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
 rem To download the setup file, run https://github.com/hamcos/monitoring-scripts/blob/master/check_mk/Makefile
-
-rem This script is only needed if you do not use configuration management (which you should use).
+rem This script is only needed if you do not use more appropriate means of configuration management.
+rem
+rem @license GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+rem
+rem This program is free software: you can redistribute it and/or modify
+rem it under the terms of the GNU General Public License as published by
+rem the Free Software Foundation, version 3 of the License.
+rem
+rem This program is distributed in the hope that it will be useful,
+rem but WITHOUT ANY WARRANTY; without even the implied warranty of
+rem MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+rem GNU General Public License for more details.
+rem
+rem You should have received a copy of the GNU General Public License
+rem along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 if exist "%programfiles%\check_mk\check_mk_agent.exe" goto installed
 if exist "%programfiles(x86)%\check_mk\check_mk_agent.exe" goto installed
@@ -39,18 +51,18 @@ echo Install agent without user interaction.
 echo Ensure that the agent is stopped.
 net stop Check_MK_Agent
 
-echo Add firewall rule to allow external access to the agent. Note that this will add a new rule each time it is executed.
+echo Add firewall rule to allow external access to the agent. Note that this will add a new rule each time it is executed (not idempotent).
 netsh advfirewall firewall add rule name="Check_MK_Agent" dir=in action=allow protocol=TCP localport=6556 enable=yes
 
 if exist "%programfiles(x86)%" goto x64
-echo Install on x86-32 architecture.
+echo Configure agent on a x86-32 system.
 mkdir "%programfiles%\check_mk"
 copy .\check_mk.ini "%programfiles%\check_mk\check_mk.ini" /y
 net start Check_MK_Agent
 goto ende
 
 :x64
-echo Install on x86-64 architecture.
+echo Configure agent on a x86-64 system.
 mkdir "%programfiles(x86)%\check_mk"
 copy .\check_mk.ini "%programfiles(x86)%\check_mk\check_mk.ini" /y
 net start Check_MK_Agent
