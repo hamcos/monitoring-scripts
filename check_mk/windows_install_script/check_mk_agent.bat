@@ -54,19 +54,27 @@ net stop Check_MK_Agent
 echo Add firewall rule to allow external access to the agent. Note that this will add a new rule each time it is executed (not idempotent).
 netsh advfirewall firewall add rule name="Check_MK_Agent" dir=in action=allow protocol=TCP localport=6556 enable=yes
 
+rem https://superuser.com/questions/342822/enable-ping-in-windows-7-firewall/343111#343111
+echo Add firewall rule to allow ICMP to the host.
+netsh advfirewall firewall add rule name="ICMP Allow incoming V4 echo request" protocol=icmpv4:8,any dir=in action=allow
+
+rem Configure on x86-32 systems {{{
 if exist "%programfiles(x86)%" goto x64
 echo Configure agent on a x86-32 system.
 mkdir "%programfiles%\check_mk"
 copy .\check_mk.ini "%programfiles%\check_mk\check_mk.ini" /y
 net start Check_MK_Agent
 goto ende
+rem }}}
 
+rem Configure on x86-64 systems {{{
 :x64
 echo Configure agent on a x86-64 system.
 mkdir "%programfiles(x86)%\check_mk"
 copy .\check_mk.ini "%programfiles(x86)%\check_mk\check_mk.ini" /y
 net start Check_MK_Agent
 goto ende
+rem }}}
 
 :installed
 echo Agent was already installed.
