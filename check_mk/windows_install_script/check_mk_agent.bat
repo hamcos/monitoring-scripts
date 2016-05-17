@@ -51,12 +51,29 @@ echo Install agent without user interaction.
 echo Ensure that the agent is stopped.
 net stop Check_MK_Agent
 
+rem Configure firewall {{{
 echo Add firewall rule to allow external access to the agent. Note that this will add a new rule each time it is executed (not idempotent).
 netsh advfirewall firewall add rule name="Check_MK_Agent" dir=in action=allow protocol=TCP localport=6556 enable=yes
 
+echo Add firewall rule to allow ICMP echo request to the host.
+
+netsh advfirewall firewall set rule name="File and Printer Sharing (Echo Request - ICMPv4-In)" new enable=yes
+
 rem https://superuser.com/questions/342822/enable-ping-in-windows-7-firewall/343111#343111
-echo Add firewall rule to allow ICMP to the host.
-netsh advfirewall firewall add rule name="ICMP Allow incoming V4 echo request" protocol=icmpv4:8,any dir=in action=allow
+rem Do not use this explicit rule because the IPv6 equivalent seems not to work.
+rem netsh advfirewall firewall add rule name="ICMP Allow incoming V4 echo request" protocol=icmpv4:8,any dir=in action=allow
+echo Ensure deprecated firewall rules are absent
+netsh advfirewall firewall delete rule name="ICMP Allow incoming V4 echo request"
+
+
+netsh advfirewall firewall set rule name="File and Printer Sharing (Echo Request - ICMPv6-In)" new enable=yes
+
+rem Although it is documented by https://technet.microsoft.com/de-de/library/ee382272%28v=ws.10%29.aspx it throws: "A specified protocol value is not valid."
+rem Well done MS …
+rem And yes, ICMPv6 echo request was filtered by the firewall by default …
+rem netsh advfirewall firewall add rule name="ICMP Allow incoming V6 echo request" protocol=icmpv6:128,0 dir=in action=allow
+
+rem }}}
 
 rem Configure on x86-32 systems {{{
 if exist "%programfiles(x86)%" goto x64
