@@ -6,7 +6,7 @@ rem @company hamcos IT Service GmbH http://www.hamcos.de
 rem To download the setup file, run https://github.com/hamcos/monitoring-scripts/blob/master/check_mk/Makefile
 rem This script is only needed if you do not use more appropriate means of configuration management.
 rem
-rem @license GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+rem @license GPL-3.0 <https://www.gnu.org/licenses/gpl-3.0.html>
 rem
 rem This program is free software: you can redistribute it and/or modify
 rem it under the terms of the GNU General Public License as published by
