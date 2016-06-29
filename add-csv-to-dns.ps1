@@ -1,6 +1,6 @@
 ## @author Robin Schneider <robin.schneider@hamcos.de>
 ## @company hamcos IT Service GmbH http://www.hamcos.de
-## @license AGPLv3 <https://www.gnu.org/licenses/agpl-3.0.html>
+## @license AGPL-3.0 <https://www.gnu.org/licenses/agpl-3.0.html>
 ##
 ## This program is free software: you can redistribute it and/or modify
 ## it under the terms of the GNU Affero General Public License as
@@ -27,6 +27,8 @@ $domain = $args[2]
 
 Import-Csv $args[0] | ForEach-Object {
 
-    dnscmd $dns_server /RecordAdd $domain $_.FQDN /createPTR A $_.IP
+    ## Example call:
+    # dnscmd 192.0.2.1 /recordadd example.com. hostname A 192.0.2.23
+    dnscmd $dns_server /RecordAdd $domain $_.hostname /createPTR A $_.IP
 
 }
