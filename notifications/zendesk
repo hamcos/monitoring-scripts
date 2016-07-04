@@ -1,0 +1,326 @@
+#!/usr/bin/env python3
+# encoding: utf-8
+# Create ticket in Zendesk
+# Bulk: yes
+#
+# Copyright (C) 2015-2016 Robin Schneider <robin.schneider@hamcos.de>
+# Copyright (C) 2015-2016 hamcos IT Service GmbH http://www.hamcos.de
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, version 2 of the License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+#
+# Possible extensions:
+# * http://lists.mathias-kettner.de/pipermail/checkmk-en/2015-January/014227.html
+#
+# Argument 1: Zendesk group ID.
+# Argument (n % 3 = 0): custom_fields id
+# Argument (n % 3 = 1): custom_fields value for non bulk messages
+# Argument (n % 3 = 2): custom_fields value for bulk messages
+#
+# https://mathias-kettner.de/checkmk_flexible_notifications.html#Writing%20notification%20scripts
+
+__license__ = 'GPL-2.0'
+__author__ = 'Robin Schneider <robin.schneider@hamcos.de>'
+
+"""
+Check_MK notification script which creates a new ticket for every notification
+in Zendesk.
+The script supports bulk notifications.
+
+Tested with:
+
+* Check_MK 1.2.6p16
+"""
+
+__version__ = '0.8'
+__status__ = 'Production'
+
+import logging
+import textwrap
+from configparser import ConfigParser
+from pprint import pformat
+
+from hamcos import get_criticality_for_tags, get_criticality_for_id, read_contexts, substitute_context
+from zdesk import Zendesk
+
+# Not sure about this plac thingy used for argument parsing.
+#  import zdeskcfg
+
+
+class CheckMKZendeskNotify:
+
+    # https://support.zendesk.com/hc/en-us/articles/203691016-Formatting-text-with-Markdown
+    _TMPL_HOST_TXT = textwrap.dedent("""
+        Host:     $HOSTNAME$ ($HOSTALIAS$)
+        Address:  $HOSTADDRESS$
+        State:    $HOSTSTATE$ ($NOTIFICATIONTYPE$)
+
+        Output:   $HOSTOUTPUT$
+        Perfdata: $HOSTPERFDATA$
+        $LONGHOSTOUTPUT$
+
+        Hosttags: $HOSTTAGS$
+
+        Host URL: $HOSTFORURL$
+        """)
+
+    _TMPL_SERVICE_TXT = textwrap.dedent("""
+        Host:     $HOSTNAME$ ($HOSTALIAS$)
+        Address:  $HOSTADDRESS$
+        Service:  $SERVICEDESC$
+        State:    $SERVICESTATE$ ($NOTIFICATIONTYPE$)
+
+        Output:   $SERVICEOUTPUT$
+        Perfdata: $SERVICEPERFDATA$
+        $LONGSERVICEOUTPUT$
+
+        Hosttags: $HOSTTAGS$
+
+        Host URL: $HOSTFORURL$
+        """)
+
+    def __init__(
+        self,
+        contexts,
+        url_prefix=None,
+        mon_conf_host_url=None,
+    ):
+
+        self._contexts = contexts
+        self._bulk = len(self._contexts) > 1
+        self._message = ''
+        self._service_desc = set([])
+        self._url_prefix = url_prefix
+        self._mon_conf_host_url = mon_conf_host_url
+        self._highest_criticality = None
+
+        self._hosts = set([])
+        for context in self._contexts:
+            self._hosts.add(context['HOSTNAME'])
+            if 'SERVICEDESC' in context:
+                self._service_desc.add(context['SERVICEDESC'])
+
+            criticality = get_criticality_for_tags(context['HOSTTAGS'])[2]
+            if not self._highest_criticality or criticality < self._highest_criticality:
+                self._highest_criticality = criticality
+
+            if self._bulk:
+                self._message += '\n\n# {}'.format(
+                    self._get_subject(context)
+                )
+            if self._mon_conf_host_url:
+                context['HOSTFORURL'] = self._mon_conf_host_url + context['HOSTFORURL']
+            self._message += self._get_messages_for_context(context)
+
+        if self._bulk:
+            self._subject = self._get_bulk_subject(self._contexts)
+        else:
+            self._subject = self._get_subject(self._contexts[0])
+
+    def _get_subject(self, context):
+        tmpl_host_subject = '$HOSTNAME$ - $NOTIFICATIONTYPE$'
+        tmpl_service_subject = '$HOSTNAME$/$SERVICEDESC$ $NOTIFICATIONTYPE$'
+
+        if context['WHAT'] == 'HOST':
+            tmpl = context.get('PARAMETER_HOST_SUBJECT') or tmpl_host_subject
+            subject = substitute_context(tmpl, context)
+        else:
+            tmpl = context.get('PARAMETER_SERVICE_SUBJECT') or tmpl_service_subject
+            subject = substitute_context(tmpl, context)
+
+        if self._highest_criticality is not None:
+            subject += ' ({})'.format(get_criticality_for_id(self._highest_criticality)[0])
+
+        return subject
+
+    def _get_bulk_subject(self, contexts):
+        if len(self._hosts) == 1:
+            subject = "{0:d} notifications for {1:s}".format(
+                len(contexts),
+                contexts[0]['HOSTNAME'],
+            )
+        else:
+            subject = "{0:d} notifications for {1:d} hosts".format(
+                len(contexts),
+                len(self._hosts),
+            )
+
+        if self._service_desc:
+            subject += ', type{}: {}'.format(
+                's' if len(self._service_desc) > 1 else '',
+                ', '.join(self._service_desc),
+            )
+
+        if self._highest_criticality is not None:
+            subject += ' ({})'.format(get_criticality_for_id(self._highest_criticality)[0])
+
+        return subject
+
+    def _get_messages_for_context(self, context):
+        if context['WHAT'] == 'HOST':
+            tmpl_txt = self._TMPL_HOST_TXT
+        else:
+            tmpl_txt = self._TMPL_SERVICE_TXT
+
+        return substitute_context(tmpl_txt, context)
+
+    def get_ticket_data(
+        self,
+        priority=None,
+        group_id=None,
+        custom_fields=[],
+        custom_fields_raw=[],
+        tags=[],
+    ):
+
+        if not priority:
+            priority = 'high' if (self._highest_criticality == 0) else 'normal'
+
+        # 'priority': 'urgent',
+        # 'priority': 'high',
+        # 'priority': 'normal',
+        # 'priority': 'low',
+
+        if not len(custom_fields_raw) and len(custom_fields) > 0 and len(custom_fields) % 3 == 0:
+            for id_field_index in range(0, len(custom_fields), 3):
+                value = custom_fields[id_field_index + 1 + self._bulk]
+                if value == 'none':
+                    continue
+
+                value = substitute_context(value, self._contexts[0])
+                custom_fields_raw.append({
+                    'id': int(custom_fields[id_field_index]),
+                    'value': value,
+                })
+
+        ticket = {
+            'subject': self._subject,
+            'description': self._message,
+            'type': 'problem',
+            'priority': priority,
+            'custom_fields': custom_fields_raw,
+        }
+        if group_id:
+            ticket['group_id'] = int(group_id)
+        if tags:
+            ticket['tags'] = tags
+        return {
+            'ticket': ticket,
+        }
+
+
+if __name__ == '__main__':
+    from argparse import ArgumentParser
+
+    args_parser = ArgumentParser(
+        description=__doc__,
+    )
+    args_parser.add_argument(
+        '-V', '--version',
+        action='version',
+        version='%(prog)s {version}'.format(version=__version__)
+    )
+    args_parser.add_argument(
+        '-d', '--debug',
+        help="Print lots of debugging statements.",
+        action='store_const',
+        dest='loglevel',
+        const=logging.DEBUG,
+        default=logging.ERROR,
+    )
+    args_parser.add_argument(
+        '-v', '--verbose',
+        help="Be verbose.",
+        action='store_const',
+        dest='loglevel',
+        const=logging.INFO,
+    )
+    args_parser.add_argument(
+        '-b', '--bulk',
+        help="Notification bulk mode.",
+        # https://mathias-kettner.de/checkmk_rbn.html#Bulk%20Notifications
+        action='store_true',
+        default=False,
+    )
+    args_parser.add_argument(
+        '-t', '--test',
+        help="Test mode. Do not actually create a ticket.",
+        action='store_true',
+        default=False,
+    )
+    args_parser.add_argument(
+        '-c', '--config',
+        help="INI configuration file path."
+        " Default: %(default)s.",
+        default='/etc/check_mk/zendesk.cfg',
+    )
+    args_parser.add_argument(
+        '-z', '--zendesk-section',
+        help="Section of the INI configuration to use as Zendesk configuration."
+        " Default: %(default)s.",
+        default='zdesk',
+    )
+    args = args_parser.parse_args()
+    logger = logging.getLogger(__file__)
+    logging.basicConfig(
+        format='%(levelname)s: %(message)s',
+        level=args.loglevel,
+    )
+
+    zendesk_config = ConfigParser()
+    with open(args.config) as f:
+        zendesk_config.readfp(f)
+
+    if args.zendesk_section not in zendesk_config:
+        raise KeyError('Could not find "{}" section in your configuration file.'.format(
+            args.zendesk_section,
+        ))
+
+    zendesk = Zendesk(
+        zendesk_config[args.zendesk_section]['url'],
+        zendesk_config[args.zendesk_section]['email'],
+        zendesk_config[args.zendesk_section]['password'],
+        zendesk_config[args.zendesk_section]['token'],
+    )
+    #  print(zendesk.tickets_list())
+    #  print(zendesk.groups_list())
+
+    parameters, contexts = read_contexts(args.bulk)
+
+    # FIXME(ypid): I could not quite figure out yet how this url_prefix passing
+    # in Check MK is supposed to work.
+    if 'check_mk' in zendesk_config:
+        url_prefix = zendesk_config['check_mk']['url_prefix']
+        mon_conf_host_url = url_prefix + '/check_mk/index.py?start_url=%2Fcheck_mk%2Fview.py%3Fview_name%3Dhost%26host%3D'
+
+    cmk_zendesk_notifier = CheckMKZendeskNotify(
+        contexts,
+        url_prefix=url_prefix,
+        mon_conf_host_url=mon_conf_host_url,
+    )
+
+    parameters = parameters['PARAMETERS'].split()
+    group_id = parameters[0]
+    del parameters[0]
+    custom_fields = parameters
+    ticket_data = cmk_zendesk_notifier.get_ticket_data(
+        group_id=group_id,
+        custom_fields=custom_fields,
+    )
+    logger.info(pformat(ticket_data))
+
+    if not args.test:
+        result = zendesk.ticket_create(data=ticket_data)
+        logging.info(pformat(result))
+
+# }}}
